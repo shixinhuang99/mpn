@@ -1,0 +1,10 @@
+[package]
+name = "mpn_config"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+indexmap = "2.2.6"

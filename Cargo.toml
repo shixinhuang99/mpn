@@ -1,0 +1,24 @@
+[package]
+name = "mpn"
+version = "0.1.0"
+edition = "2021"
+authors = ["shixinhuang99 <shixinhuang99@gmail.com>"]
+description = "mpn"
+repository = "https://github.com/shixinhuang99/mpn"
+license = "MIT"
+
+[workspace]
+members = ["crates/*", "lab"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+authors = ["shixinhuang99 <shixinhuang99@gmail.com>"]
+repository = "https://github.com/shixinhuang99/mpn"
+license = "MIT"
+
+[profile.release]
+strip = true
+lto = true
+panic = "abort"
+codegen-units = 1
