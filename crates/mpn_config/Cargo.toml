@@ -11,5 +11,9 @@ doc = false
 doctest = false
 
 [dependencies]
+derive_builder = "0.20.0"
 terminal_size = "0.3.0"
 unindent = "0.2.3"
+
+[dev-dependencies]
+insta = { version = "1.39.0", features = ["yaml"] }

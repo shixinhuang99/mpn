@@ -32,3 +32,6 @@ rslab:
 
 jslab:
 	node ./lab/lab.js
+
+test-config:
+	cargo insta test --review -p mpn_config

@@ -1,0 +1,14 @@
+---
+source: crates/mpn_config/tests/definition.rs
+expression: description of deprecated thing 1
+---
+#### `deprecated`
+
+* Default: A number bigger than 1
+* Type: An expression of a numeric quantity using numerals
+* DEPRECATED: do not use this
+
+it should not be used ever
+
+not even once.
+

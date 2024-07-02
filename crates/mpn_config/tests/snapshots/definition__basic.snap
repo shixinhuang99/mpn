@@ -1,0 +1,11 @@
+---
+source: crates/mpn_config/tests/definition.rs
+expression: def.describe()
+---
+#### `key`
+
+* Default: "some default value"
+* Type: Number or String
+
+just a test thingie
+

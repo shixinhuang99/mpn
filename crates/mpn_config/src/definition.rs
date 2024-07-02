@@ -1,66 +1,79 @@
 use std::sync::OnceLock;
 
+use derive_builder::Builder;
 use unindent::unindent;
 
 use crate::type_def::TypeDef;
 
-pub struct DefinitionOptions {
-	key: &'static str,
-	default: TypeDef,
-	types: &'static [TypeDef],
-	description: &'static str,
-	multiple: bool,
-	short: Option<&'static [&'static str]>,
-	deprecated: Option<&'static str>,
-	exclusive: Option<&'static [&'static str]>,
-}
-
+#[derive(Builder)]
+#[builder(pattern = "owned", setter(strip_option), build_fn(skip))]
 pub struct Definition {
-	key: &'static str,
-	default: TypeDef,
-	types: &'static [TypeDef],
-	description: &'static str,
-	env_export: bool,
+	pub key: &'static str,
+	pub default_value: TypeDef,
+	pub types: &'static [TypeDef],
+	pub description: &'static str,
+	#[builder(setter(skip))]
+	pub env_export: bool,
+	#[allow(unused)]
 	multiple: bool,
-	default_description: String,
-	type_description: String,
-	hint: String,
-	short: Option<&'static [&'static str]>,
-	usage: String,
-	deprecated: Option<&'static str>,
-	exclusive: Option<&'static [&'static str]>,
+	#[builder(setter(into))]
+	pub default_description: String,
+	#[builder(setter(into))]
+	pub type_description: String,
+	pub hint: String,
+	pub short: Option<&'static [&'static str]>,
+	pub usage: String,
+	pub deprecated: Option<&'static str>,
+	pub exclusive: Option<&'static [&'static str]>,
+	terminal_cols: usize,
 	// flatten
 }
 
-impl Definition {
-	pub fn new(options: DefinitionOptions) -> Self {
-		let default_description = options.default.to_string();
-		let type_description = describe_type(options.types, options.multiple);
-		let hint = hint(options.types, options.key);
-		let usage = describe_usage(
-			options.types,
-			options.short,
-			&options.default,
-			options.key,
-			&hint,
-			options.multiple,
-		);
+impl DefinitionBuilder {
+	pub fn build(self) -> Definition {
+		let key = self.key.expect("`key` is required");
+		let default_value =
+			self.default_value.expect("`default_value` is required");
+		let types = self.types.expect("`types` is required");
+		let description = self.description.expect("`description` is required");
+		let multiple = self.multiple.unwrap_or(false);
+		let default_description = self
+			.default_description
+			.unwrap_or_else(|| default_value.to_string());
+		let type_description = self
+			.type_description
+			.unwrap_or_else(|| describe_type(types, multiple));
+		let hint = self.hint.unwrap_or_else(|| hint(types, key));
+		let short = self.short.unwrap_or_default();
+		let usage = self.usage.unwrap_or_else(|| {
+			describe_usage(types, short, &default_value, key, &hint, multiple)
+		});
+		let deprecated = self.deprecated.unwrap_or_default();
+		let exclusive = self.exclusive.unwrap_or_default();
+		let terminal_cols = self.terminal_cols.unwrap_or_else(terminal_columns);
 
-		Self {
-			key: options.key,
-			default: options.default,
-			types: options.types,
-			description: options.description,
-			multiple: options.multiple,
+		Definition {
+			key,
+			default_value,
+			types,
+			description,
 			env_export: true,
-			short: None,
+			multiple,
 			default_description,
 			type_description,
 			hint,
+			short,
 			usage,
-			deprecated: options.deprecated,
-			exclusive: options.exclusive,
+			deprecated,
+			exclusive,
+			terminal_cols,
 		}
+	}
+}
+
+impl Definition {
+	pub fn builder() -> DefinitionBuilder {
+		DefinitionBuilder::create_empty()
 	}
 
 	pub fn describe(&self) -> String {
@@ -81,27 +94,27 @@ impl Definition {
 			"".to_string()
 		};
 
-		let tmp = wrap_all(&format!(
-			"
-			#### `{}`
+		wrap_all(
+			unindent(&format!(
+				"
+				#### `{}`
 
-			* Default: {}
-			* Type: {}
-			{}
-			{}
-			{}
-			{}
-			",
-			self.key,
-			unindent(&self.default_description),
-			unindent(&self.type_description),
-			deprecated,
-			description,
-			exclusive,
-			no_env_export,
-		));
-
-		unindent(&tmp)
+				* Default: {}
+				* Type: {}
+				{}
+				{}
+				{}
+				{}",
+				self.key,
+				unindent(&self.default_description),
+				unindent(&self.type_description),
+				deprecated,
+				description,
+				exclusive,
+				no_env_export,
+			)),
+			self.terminal_cols,
+		)
 	}
 }
 
@@ -216,21 +229,20 @@ fn terminal_columns() -> usize {
 
 	*TERMINAL_COLUMNS.get_or_init(|| {
 		if let Some(size) = terminal_size::terminal_size() {
-			return size.0.0 as usize;
+			return (size.0.0.clamp(20, 80) - 5) as usize;
 		}
-		80
+		75
 	})
 }
 
-fn wrap(s: &str) -> String {
-	let cols = terminal_columns().clamp(20, 80) - 5;
+fn wrap(s: &str, terminal_cols: usize) -> String {
 	let mut ret: Vec<String> = Vec::new();
 	let mut words: Vec<&str> = Vec::new();
 	let mut len = 0;
 	let s = unindent(s);
 
 	for word in s.split_ascii_whitespace() {
-		if len + word.len() > cols {
+		if len + word.len() > terminal_cols {
 			ret.push(words.join(" "));
 			words.clear();
 			len = 0;
@@ -247,7 +259,7 @@ fn wrap(s: &str) -> String {
 	ret.join("\n")
 }
 
-fn wrap_all(s: &str) -> String {
+fn wrap_all(s: String, terminal_cols: usize) -> String {
 	let mut in_code_block = false;
 
 	s.split("\n\n")
@@ -263,36 +275,13 @@ fn wrap_all(s: &str) -> String {
 					.collect::<String>()
 					.trim_ascii()
 					.split("\n* ")
-					.map(|li| wrap(li).replace("\n", "\n  "))
+					.map(|li| wrap(li, terminal_cols).replace("\n", "\n  "))
 					.collect::<Vec<String>>()
 					.join("\n* ");
 				return format!("* {}", tmp);
 			}
-			wrap(block)
+			wrap(block, terminal_cols)
 		})
 		.collect::<Vec<String>>()
 		.join("\n\n")
-}
-
-#[cfg(test)]
-mod tests {
-	use super::{Definition, DefinitionOptions, TypeDef};
-
-	#[test]
-	fn basic_definition() {
-		let def = Definition::new(DefinitionOptions {
-			key: "key",
-			default: TypeDef::StringV("some default value"),
-			types: &[TypeDef::Number, TypeDef::String],
-			description: "just a test thingie",
-			multiple: false,
-			short: None,
-			deprecated: None,
-			exclusive: None,
-		});
-		assert_eq!(def.hint, "<key>");
-		assert_eq!(def.usage, "--key <key>");
-		assert_eq!(def.type_description, "Number or String");
-		assert!(def.env_export);
-	}
 }
