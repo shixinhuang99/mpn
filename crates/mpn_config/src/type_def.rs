@@ -15,6 +15,7 @@ pub enum TypeDef {
 	Semver,
 	Umask,
 	Null,
+	Array(&'static [TypeDef]),
 }
 
 impl TypeDef {
@@ -44,6 +45,24 @@ impl Display for TypeDef {
 			TypeDef::Date => write!(f, "Date"),
 			TypeDef::Path => write!(f, "Path"),
 			TypeDef::Semver => write!(f, "SemVer string"),
+			TypeDef::Array(v) => {
+				let len = v.len();
+				let ret = match len {
+					0 => "".to_string(),
+					1 => v[0].to_string(),
+					2 => format!("{} or {}", v[0], v[1]),
+					_ => {
+						v.iter().enumerate().fold(String::new(), |s, (i, t)| {
+							if i == len - 1 {
+								format!("{}or {}", s, t)
+							} else {
+								format!("{}{}, ", s, t)
+							}
+						})
+					}
+				};
+				write!(f, "{}", ret)
+			}
 		}
 	}
 }

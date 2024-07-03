@@ -10,7 +10,7 @@ use crate::type_def::TypeDef;
 pub struct Definition {
 	pub key: &'static str,
 	pub default_value: TypeDef,
-	pub types: &'static [TypeDef],
+	pub type_def: TypeDef,
 	pub description: &'static str,
 	#[builder(setter(skip))]
 	pub env_export: bool,
@@ -22,6 +22,7 @@ pub struct Definition {
 	pub type_description: String,
 	pub hint: String,
 	pub short: Option<&'static [&'static str]>,
+	#[builder(setter(into))]
 	pub usage: String,
 	pub deprecated: Option<&'static str>,
 	pub exclusive: Option<&'static [&'static str]>,
@@ -34,7 +35,7 @@ impl DefinitionBuilder {
 		let key = self.key.expect("`key` is required");
 		let default_value =
 			self.default_value.expect("`default_value` is required");
-		let types = self.types.expect("`types` is required");
+		let type_def = self.type_def.expect("`types` is required");
 		let description = self.description.expect("`description` is required");
 		let multiple = self.multiple.unwrap_or(false);
 		let default_description = self
@@ -42,11 +43,18 @@ impl DefinitionBuilder {
 			.unwrap_or_else(|| default_value.to_string());
 		let type_description = self
 			.type_description
-			.unwrap_or_else(|| describe_type(types, multiple));
-		let hint = self.hint.unwrap_or_else(|| hint(types, key));
+			.unwrap_or_else(|| describe_type(&type_def, multiple));
+		let hint = self.hint.unwrap_or_else(|| hint(&type_def, key));
 		let short = self.short.unwrap_or_default();
 		let usage = self.usage.unwrap_or_else(|| {
-			describe_usage(types, short, &default_value, key, &hint, multiple)
+			describe_usage(
+				&type_def,
+				short,
+				&default_value,
+				key,
+				&hint,
+				multiple,
+			)
 		});
 		let deprecated = self.deprecated.unwrap_or_default();
 		let exclusive = self.exclusive.unwrap_or_default();
@@ -55,7 +63,7 @@ impl DefinitionBuilder {
 		Definition {
 			key,
 			default_value,
-			types,
+			type_def,
 			description,
 			env_export: true,
 			multiple,
@@ -117,32 +125,16 @@ impl Definition {
 	}
 }
 
-fn describe_type(types: &[TypeDef], multiple: bool) -> String {
-	let len = types.len();
-	let words = match len {
-		0 => "".to_string(),
-		1 => types[0].to_string(),
-		2 => format!("{} or {}", types[0], types[1]),
-		_ => {
-			types.iter().enumerate().fold(String::new(), |s, (i, t)| {
-				if i == len - 1 {
-					format!("{}or {}", s, t)
-				} else {
-					format!("{}{}, ", s, t)
-				}
-			})
-		}
-	};
-
+fn describe_type(type_def: &TypeDef, multiple: bool) -> String {
 	if multiple {
-		format!("{} (can be set multiple times)", words)
+		format!("{} (can be set multiple times)", type_def)
 	} else {
-		words
+		type_def.to_string()
 	}
 }
 
-fn hint(type_def: &[TypeDef], key: &str) -> String {
-	if type_def == [TypeDef::Number] {
+fn hint(type_def: &TypeDef, key: &str) -> String {
+	if *type_def == TypeDef::Number {
 		"<number>".to_string()
 	} else {
 		format!("<{}>", key)
@@ -150,76 +142,77 @@ fn hint(type_def: &[TypeDef], key: &str) -> String {
 }
 
 fn describe_usage(
-	types: &[TypeDef],
+	type_def: &TypeDef,
 	short: Option<&[&str]>,
 	default: &TypeDef,
 	key: &str,
 	hint: &str,
 	multiple: bool,
 ) -> String {
-	if types.len() == 1 {
+	if let TypeDef::Array(types) = type_def {
+		let mut s = format!("--{}", key);
+
+		if let Some(short) = short {
+			s = format!("-{}|--{}", short.join(","), key);
+		}
+
+		let filtered_types: Vec<&TypeDef> = types
+			.iter()
+			.filter(|t| !matches!(t, TypeDef::Null | TypeDef::Boolean))
+			.collect();
+
+		if filtered_types.is_empty() {
+			return s;
+		}
+
+		let spcific_strs: Vec<&str> = filtered_types
+			.iter()
+			.filter_map(|t| {
+				if let TypeDef::StringV(s) = t {
+					if !s.is_empty() {
+						return Some(*s);
+					}
+				}
+				None
+			})
+			.collect();
+
+		let desc = if spcific_strs.is_empty() {
+			hint.to_string()
+		} else {
+			format!("<{}>", spcific_strs.join("|"))
+		};
+
+		if types.contains(&TypeDef::Boolean) {
+			s = format!("--no-{}|{}", key, s);
+		}
+
+		let usage = format!("{} {}", s, desc);
+
+		if multiple {
+			format!("{} [{} ...]", usage, usage)
+		} else {
+			usage
+		}
+	} else {
 		let mut s = String::new();
 
 		if let Some(short) = short {
 			s.push_str(&format!("-{}|", short.join(",")));
 		}
 
-		if types == [TypeDef::Boolean] && *default != TypeDef::BooleanV(false) {
+		if *type_def == TypeDef::Boolean && *default != TypeDef::BooleanV(false)
+		{
 			s.push_str(&format!("--no-{}", key));
 		} else {
 			s.push_str(&format!("--{}", key));
 		}
 
-		if types != [TypeDef::Boolean] {
+		if *type_def != TypeDef::Boolean {
 			s.push_str(&format!(" {}", hint));
 		}
 
-		return s;
-	}
-
-	let mut s = format!("--{}", key);
-
-	if let Some(short) = short {
-		s = format!("-{}|--{}", short.join(","), key);
-	}
-
-	let filtered_types: Vec<&TypeDef> = types
-		.iter()
-		.filter(|t| !matches!(t, TypeDef::Null | TypeDef::Boolean))
-		.collect();
-
-	if filtered_types.is_empty() {
-		return s;
-	}
-
-	let spcific_strs: Vec<&str> = filtered_types
-		.iter()
-		.filter_map(|t| {
-			if let TypeDef::StringV(s) = t {
-				if !s.is_empty() {
-					return Some(*s);
-				}
-			}
-			None
-		})
-		.collect();
-
-	let desc = if spcific_strs.is_empty() {
-		hint.to_string()
-	} else {
-		format!("<{}>", spcific_strs.join("|"))
-	};
-
-	if types.contains(&TypeDef::Boolean) {
-		s = format!("--no-{}|{}", key, s);
-	}
-
-	let usage = format!("{} {}", s, desc);
-
-	if multiple {
-		format!("{} [{} ...]", usage, usage)
-	} else {
-		usage
+		s
 	}
 }
 
