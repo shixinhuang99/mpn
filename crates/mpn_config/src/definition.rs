@@ -95,16 +95,15 @@ impl Definition {
 		};
 
 		wrap_all(
-			unindent(&format!(
-				"
-				#### `{}`
+			format!(
+				"#### `{}`
 
-				* Default: {}
-				* Type: {}
-				{}
-				{}
-				{}
-				{}",
+* Default: {}
+* Type: {}
+{}
+{}
+{}
+{}",
 				self.key,
 				unindent(&self.default_description),
 				unindent(&self.type_description),
@@ -112,7 +111,7 @@ impl Definition {
 				description,
 				exclusive,
 				no_env_export,
-			)),
+			),
 			self.terminal_cols,
 		)
 	}
@@ -228,6 +227,9 @@ fn terminal_columns() -> usize {
 	static TERMINAL_COLUMNS: OnceLock<usize> = OnceLock::new();
 
 	*TERMINAL_COLUMNS.get_or_init(|| {
+		if cfg!(test) {
+			return 75;
+		}
 		if let Some(size) = terminal_size::terminal_size() {
 			return (size.0.0.clamp(20, 80) - 5) as usize;
 		}

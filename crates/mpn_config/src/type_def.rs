@@ -6,15 +6,14 @@ pub enum TypeDef {
 	StringV(&'static str),
 	Boolean,
 	BooleanV(bool),
-	// Url,
+	Url,
 	Number,
 	NumberV(i32),
-	// Path,
+	Path,
 	// Stream,
-	// Date,
-	// Array,
-	// Semver,
-	// Umask,
+	Date,
+	Semver,
+	Umask,
 	Null,
 }
 
@@ -38,6 +37,13 @@ impl Display for TypeDef {
 			TypeDef::Number => write!(f, "Number"),
 			TypeDef::NumberV(v) => write!(f, "{}", v),
 			TypeDef::Null => write!(f, "null"),
+			TypeDef::Umask => {
+				write!(f, "Octal numeric string in range 0000..0777 (0..511)")
+			}
+			TypeDef::Url => write!(f, "URL"),
+			TypeDef::Date => write!(f, "Date"),
+			TypeDef::Path => write!(f, "Path"),
+			TypeDef::Semver => write!(f, "SemVer string"),
 		}
 	}
 }
