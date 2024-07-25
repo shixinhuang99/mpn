@@ -1,18 +1,20 @@
-use std::sync::OnceLock;
-
 use derive_builder::Builder;
 use unindent::unindent;
 
-use crate::type_def::TypeDef;
+use crate::{type_def::TypeDef, util::TERMINAL_COLUMNS};
 
 #[derive(Builder)]
-#[builder(pattern = "owned", setter(strip_option), build_fn(skip))]
+#[builder(
+	pattern = "owned",
+	setter(strip_option),
+	build_fn(skip),
+	derive(Clone)
+)]
 pub struct Definition {
 	pub key: &'static str,
 	pub default_value: TypeDef,
 	pub type_def: TypeDef,
 	pub description: &'static str,
-	#[builder(setter(skip))]
 	pub env_export: bool,
 	#[allow(unused)]
 	multiple: bool,
@@ -20,6 +22,7 @@ pub struct Definition {
 	pub default_description: String,
 	#[builder(setter(into))]
 	pub type_description: String,
+	#[builder(setter(into))]
 	pub hint: String,
 	pub short: Option<&'static [&'static str]>,
 	#[builder(setter(into))]
@@ -35,7 +38,7 @@ impl DefinitionBuilder {
 		let key = self.key.expect("`key` is required");
 		let default_value =
 			self.default_value.expect("`default_value` is required");
-		let type_def = self.type_def.expect("`types` is required");
+		let type_def = self.type_def.expect("`type_def` is required");
 		let description = self.description.expect("`description` is required");
 		let multiple = self.multiple.unwrap_or(false);
 		let default_description = self
@@ -58,14 +61,16 @@ impl DefinitionBuilder {
 		});
 		let deprecated = self.deprecated.unwrap_or_default();
 		let exclusive = self.exclusive.unwrap_or_default();
-		let terminal_cols = self.terminal_cols.unwrap_or_else(terminal_columns);
+		let terminal_cols =
+			self.terminal_cols.unwrap_or_else(|| *TERMINAL_COLUMNS);
+		let env_export = self.env_export.unwrap_or(true);
 
 		Definition {
 			key,
 			default_value,
 			type_def,
 			description,
-			env_export: true,
+			env_export,
 			multiple,
 			default_description,
 			type_description,
@@ -216,46 +221,29 @@ fn describe_usage(
 	}
 }
 
-fn terminal_columns() -> usize {
-	static TERMINAL_COLUMNS: OnceLock<usize> = OnceLock::new();
-
-	*TERMINAL_COLUMNS.get_or_init(|| {
-		if cfg!(test) {
-			return 75;
-		}
-		if let Some(size) = terminal_size::terminal_size() {
-			return (size.0.0.clamp(20, 80) - 5) as usize;
-		}
-		75
-	})
-}
-
-fn wrap(s: &str, terminal_cols: usize) -> String {
-	let mut ret: Vec<String> = Vec::new();
-	let mut words: Vec<&str> = Vec::new();
-	let mut len = 0;
-	let s = unindent(s);
-
-	for word in s.split_ascii_whitespace() {
-		if len + word.len() > terminal_cols {
-			ret.push(words.join(" "));
-			words.clear();
-			len = 0;
-		} else {
-			words.push(word);
-			len += word.len();
-		}
-	}
-
-	if !words.is_empty() {
-		ret.push(words.join(" "));
-	}
-
-	ret.join("\n")
+fn wrap(s: &str, cols: usize) -> String {
+	unindent(s).split_ascii_whitespace().fold(
+		String::new(),
+		|mut left, right| {
+			if left.is_empty() {
+				return right.to_string();
+			}
+			let last = left.split("\n").last();
+			let join = if last.is_some_and(|l| l.len() + right.len() > cols) {
+				"\n"
+			} else {
+				" "
+			};
+			left.push_str(join);
+			left.push_str(right);
+			left
+		},
+	)
 }
 
 fn wrap_all(s: String, terminal_cols: usize) -> String {
 	let mut in_code_block = false;
+	let cols = terminal_cols.clamp(20, 80) - 5;
 
 	s.split("\n\n")
 		.map(|block| {
@@ -270,12 +258,12 @@ fn wrap_all(s: String, terminal_cols: usize) -> String {
 					.collect::<String>()
 					.trim_ascii()
 					.split("\n* ")
-					.map(|li| wrap(li, terminal_cols).replace("\n", "\n  "))
+					.map(|li| wrap(li, cols).replace("\n", "\n  "))
 					.collect::<Vec<String>>()
 					.join("\n* ");
 				return format!("* {}", tmp);
 			}
-			wrap(block, terminal_cols)
+			wrap(block, cols)
 		})
 		.collect::<Vec<String>>()
 		.join("\n\n")

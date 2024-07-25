@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter, Result};
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum TypeDef {
 	String,
 	StringV(&'static str),
@@ -46,14 +46,13 @@ impl Display for TypeDef {
 			TypeDef::Path => write!(f, "Path"),
 			TypeDef::Semver => write!(f, "SemVer string"),
 			TypeDef::Array(v) => {
-				let len = v.len();
-				let ret = match len {
+				let ret = match v.len() {
 					0 => "".to_string(),
 					1 => v[0].to_string(),
 					2 => format!("{} or {}", v[0], v[1]),
 					_ => {
 						v.iter().enumerate().fold(String::new(), |s, (i, t)| {
-							if i == len - 1 {
+							if i == v.len() - 1 {
 								format!("{}or {}", s, t)
 							} else {
 								format!("{}{}, ", s, t)

@@ -28,10 +28,13 @@ push-tag tag:
 	git push origin {{tag}}
 
 rslab:
-	cargo run -p lab
+	cargo +stable run -p lab
 
 jslab:
 	node ./lab/lab.js
 
+test *args:
+	cargo +stable test {{args}}
+
 test-config:
-	cargo insta test --review -p mpn_config
+	cargo +stable insta test --review -p mpn_config

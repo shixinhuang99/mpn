@@ -166,4 +166,121 @@ fn test_basic_definition() {
 		.description("test description")
 		.build();
 	assert_eq!(multi_has_short.usage, "-t|--key <key>");
+
+	let hard_coded_types = Definition::builder()
+		.key("key")
+		.default_value(TypeDef::StringV("test default"))
+		.type_def(TypeDef::Array(&[
+			TypeDef::StringV("string1"),
+			TypeDef::StringV("string2"),
+		]))
+		.description("test description")
+		.build();
+	assert_eq!(hard_coded_types.usage, "--key <string1|string2>");
+
+	let hard_coded_optional_types = Definition::builder()
+		.key("key")
+		.default_value(TypeDef::StringV("test default"))
+		.type_def(TypeDef::Array(&[
+			TypeDef::Null,
+			TypeDef::StringV("string1"),
+			TypeDef::StringV("string2"),
+		]))
+		.description("test description")
+		.build();
+	assert_eq!(hard_coded_optional_types.usage, "--key <string1|string2>");
+
+	let has_hint = Definition::builder()
+		.key("key")
+		.default_value(TypeDef::StringV("test default"))
+		.type_def(TypeDef::String)
+		.description("test description")
+		.hint("<testparam>")
+		.build();
+	assert_eq!(has_hint.usage, "--key <testparam>");
+
+	let optional_bool = Definition::builder()
+		.key("key")
+		.default_value(TypeDef::Null)
+		.type_def(TypeDef::Array(&[TypeDef::Null, TypeDef::Boolean]))
+		.description("asdf")
+		.build();
+	assert_eq!(optional_bool.usage, "--key");
+
+	let no_exported = Definition::builder()
+		.key("methane")
+		.default_value(TypeDef::StringV("CH4"))
+		.type_def(TypeDef::String)
+		.type_description("Greenhouse Gas")
+		.description(
+			"This is bad for the environment, for our children, do not put it there.",
+		)
+		.env_export(false)
+		.build();
+	assert!(!no_exported.env_export);
+	assert_eq!(
+		no_exported.describe(),
+		"#### `methane`
+
+* Default: \"CH4\"
+* Type: Greenhouse Gas
+
+This is bad for the environment, for our children, do not put it there.
+
+This value is not exported to the environment for child processes."
+	);
+}
+
+#[test]
+fn test_long_description() {
+	let long_def_builder = Definition::builder()
+		.key("walden")
+		.description(
+			"
+			WHEN I WROTE the following pages, or rather the bulk of them, I lived
+			alone, in the woods, a mile from any neighbor, in a house which I had
+			built myself, on the shore of Walden Pond, in Concord, Massachusetts, and
+			earned my living by the labor of my hands only. I lived there two years
+			and two months. At present I am a sojourner in civilized life again.
+
+			I should not obtrude my affairs so much on the notice of my readers if
+			very particular inquiries had not been made by my townsmen concerning my
+			mode of life, which some would call impertinent, though they do not
+			appear to me at all impertinent, but, considering the circumstances, very
+			natural and pertinent.
+
+			```
+			this.is('a', {
+			  code: 'sample',
+			})
+
+			with (multiple) {
+			  blocks()
+			}
+			```
+			",
+		)
+		.default_value(TypeDef::BooleanV(true))
+		.type_def(TypeDef::Boolean);
+
+	let long_40 = long_def_builder.clone().terminal_cols(40).build();
+	assert_snapshot!(
+		"long_40",
+		long_40.describe(),
+		"description when terminal columns is 40"
+	);
+
+	let long_9000 = long_def_builder.clone().terminal_cols(9000).build();
+	assert_snapshot!(
+		"long_9000",
+		long_9000.describe(),
+		"description when terminal columns is 9000"
+	);
+
+	let long_0 = long_def_builder.clone().terminal_cols(0).build();
+	assert_snapshot!(
+		"long_0",
+		long_0.describe(),
+		"description when terminal columns is 0"
+	);
 }
