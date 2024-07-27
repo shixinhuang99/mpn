@@ -30,7 +30,6 @@ pub struct Definition {
 	pub deprecated: Option<&'static str>,
 	pub exclusive: Option<&'static [&'static str]>,
 	terminal_cols: usize,
-	// flatten
 }
 
 impl DefinitionBuilder {

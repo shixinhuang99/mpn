@@ -6,6 +6,7 @@ authors = ["shixinhuang99 <shixinhuang99@gmail.com>"]
 description = "mpn"
 repository = "https://github.com/shixinhuang99/mpn"
 license = "MIT"
+rust-version = "1.80"
 
 [workspace]
 members = ["crates/*", "lab"]
