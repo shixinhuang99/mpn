@@ -1,4 +1,5 @@
 mod definition;
+mod definition_v2;
 mod definitions;
 mod type_def;
 mod util;
