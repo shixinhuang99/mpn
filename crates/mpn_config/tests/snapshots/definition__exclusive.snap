@@ -1,0 +1,12 @@
+---
+source: crates/mpn_config/tests/definition.rs
+expression: description of exclusive thing
+---
+#### `exclusive`
+
+* Default: 1234
+* Type: Number
+
+a number
+
+This config can not be used with: `x`

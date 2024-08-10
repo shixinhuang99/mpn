@@ -6,5 +6,14 @@ authors.workspace = true
 repository.workspace = true
 license.workspace = true
 
+[lib]
+doc = false
+doctest = false
+
 [dependencies]
-indexmap = "2.2.6"
+derive_builder = "0.20.0"
+terminal_size = "0.3.0"
+unindent = "0.2.3"
+
+[dev-dependencies]
+insta = "1.39.0"
