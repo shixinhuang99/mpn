@@ -4,6 +4,13 @@ alias pt := push-tag
 default:
 	just --list --unsorted
 
+toolchain-vers:
+	rustup -V
+	rustc -V
+	cargo -V
+	cargo fmt --version
+	cargo clippy -V
+
 fmt:
 	cargo fmt
 	taplo fmt
@@ -28,13 +35,13 @@ push-tag tag:
 	git push origin {{tag}}
 
 rslab:
-	cargo +stable run -p lab
+	cargo run -p lab
 
 jslab:
 	node ./lab/lab.js
 
 test *args:
-	cargo +stable test {{args}}
+	cargo test {{args}}
 
 test-config:
-	cargo +stable insta test --review -p mpn_config
+	cargo insta test --review -p mpn_config
